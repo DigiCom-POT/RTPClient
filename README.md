@@ -25,3 +25,15 @@ http://localhost:8983/recommendations/UserBased?userID=100
 ```
 http://localhost:8983/recommendations/ItemBased?movieID=6659
 ```
+
+Note :
+------
+For the above URLs to work
+
+- You need to have the HBase Mater and Region Server up and running
+- Hbase Rest Deamon up and running
+```
+•	./bin/hbase-daemon.sh start rest -p 8500
+•	./bin/hbase-daemon.sh stop rest -p 8500
+```
+- Cassandra service up and running

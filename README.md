@@ -11,10 +11,15 @@ Used tech stack:
 
 Sample URLs
 -----------
-**Get Top 5 Movies**
+**Get Top 5 Movies (real time for last few hours )**
 ```
 http://localhost:8983/recommendations/TopMovies
 ``` 
+
+**Get All time Top 5 Movies (real time plus batch )**
+```
+http://localhost:8983/recommendations/AllTimeTopMovies
+```
 
 **Get Recommendations for the User**
 ```

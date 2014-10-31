@@ -31,6 +31,10 @@ http://localhost:8983/recommendations/UserBased?userID=100
 http://localhost:8983/recommendations/ItemBased?movieID=6659
 ```
 
+**High Level Arch Diagram**
+![High Level Arch Diagram](https://raw.githubusercontent.com/DigiCom-POT/RTPClient/master/src/main/resources/rtppot.PNG)
+
+
 Note :
 ------
 For the above URLs to work

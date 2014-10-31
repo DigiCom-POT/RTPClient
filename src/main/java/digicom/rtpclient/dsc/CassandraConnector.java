@@ -30,6 +30,7 @@ public class CassandraConnector {
 	private static PreparedStatement ps;
 	private static PreparedStatement load;
 	private static PreparedStatement alldata;
+	private static PreparedStatement alldatabatch;
 	//private static PreparedStatement update;
 	
 	public static void init() {
@@ -37,6 +38,7 @@ public class CassandraConnector {
 		ps = session.prepare("INSERT INTO top_movie (movieid, viewscnt, time) VALUES (?, ?, dateof(now()))");
 		load = session.prepare("select viewscnt from top_movie");
 		alldata = session.prepare("select * from top_movie");
+		alldatabatch = session.prepare("select * from top_movie_new");
 
 	}
 
@@ -68,14 +70,20 @@ public class CassandraConnector {
 		}
 	}
 
-	public static Map<String, Long> getTopMovies() {
+	public static Map<String, Long> getTopMovies(String mode) {
 		
 		Map<String, Long> moviesmap = new HashMap<String, Long>();;
 		try {
 			if (null == session) {
 				init();
 			}
-			ResultSet result = session.execute(alldata.bind());
+			ResultSet result = null;
+			if(null != mode && mode.equalsIgnoreCase("realtime")) {
+				result = session.execute(alldata.bind());
+			}else {
+				result = session.execute(alldatabatch.bind());
+			}
+			
 			if( !result.isExhausted()) {
 				List<Row> alldata = result.all();
 				for(Row row : alldata) {
@@ -88,8 +96,8 @@ public class CassandraConnector {
 		return moviesmap;
 	}
 	
-	public static Map<String, Long> getSortedTopMovies() {
-		Map<String, Long> moviesmap = getTopMovies();
+	public static Map<String, Long> getSortedTopMovies(String mode) {
+		Map<String, Long> moviesmap = getTopMovies(mode);
 		
 		//System.out.println("UNSORTED MAP " +moviesmap);
 		
@@ -134,8 +142,19 @@ public class CassandraConnector {
 	}
 
 	public static String getTopMoviesList() {
-		Map<String, Long> map = getSortedTopMovies();
+		Map<String, Long> map = getSortedTopMovies("realtime");
+		List<Movies> moviesList = getMoviesInfomation(map, 5);
+		Gson g = new Gson();
+		return g.toJson(moviesList);
+	}
 
+	/**
+	 * Gets the movies information
+	 * @param map
+	 * @param lenght
+	 * @return
+	 */
+	private static List<Movies> getMoviesInfomation(Map<String, Long> map, int lenght) {
 		List<Movies> moviesList = new ArrayList<Movies>();
 		int count = 0;
 		
@@ -158,10 +177,38 @@ public class CassandraConnector {
 			}
 			moviesList.add(m);
 			count++;
-			if(count > 5) {
+			if(lenght != -1 && count > lenght) {
 				break;
 			}
 		}
+		return moviesList;
+	}
+
+	/**	
+	 * Returns the aggregated view of the Batch And Real Time
+	 * 
+	 * @return
+	 */
+	public static String getAllTimeTopMoviesList() {
+		// Top Movies from the real time db
+		Map<String, Long> batchmap = getTopMovies("batch");
+		Map<String, Long> realtimemap = getTopMovies("real");
+		
+		for(String movie : realtimemap.keySet()) {
+			if(null != batchmap.get(movie)) {
+				System.out.println("--------");
+				batchmap.put(movie, batchmap.get(movie) + realtimemap.get(movie));
+			}else{
+				System.out.println("*****");
+				batchmap.put(movie, realtimemap.get(movie));
+			}
+		}
+		
+		ValueComparator bvc =  new ValueComparator(batchmap);
+	    TreeMap<String,Long> sorted_map = new TreeMap<String,Long>(bvc);
+	    sorted_map.putAll(batchmap);
+	    
+	    List<Movies> moviesList = getMoviesInfomation(sorted_map, 5);
 		Gson g = new Gson();
 		return g.toJson(moviesList);
 	}

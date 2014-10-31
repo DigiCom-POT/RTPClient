@@ -18,9 +18,10 @@ public class TopMovieWebClientSVB {
 	}
 
 	@RequestMapping("/getTopMovies")
-	public String getTopMovies() {
+	public String getTopMovies(@RequestParam String mode) {
+		// Mode can be either realtime or batch
 		Gson g = new Gson();
-		return g.toJson(CassandraConnector.getTopMovies());
+		return g.toJson(CassandraConnector.getTopMovies(mode));
 	}
 
 	@RequestMapping("/recommendations/TopMovies")
@@ -37,6 +38,12 @@ public class TopMovieWebClientSVB {
 	@RequestMapping("/recommendations/ItemBased")
 	public String similarMovieRecommend(@RequestParam String movieID) {
 		return FluentHbaseClient.similarMovieRecommend(movieID);
+	}
+	
+	
+	@RequestMapping("/recommendations/AllTimeTopMovies")
+	public String allTimeTopMovies() {
+		return CassandraConnector.getAllTimeTopMoviesList().toString();
 	}
 	
 }

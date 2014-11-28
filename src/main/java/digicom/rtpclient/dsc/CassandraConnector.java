@@ -9,8 +9,9 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.http.client.ClientProtocolException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.Metadata;
@@ -27,104 +28,57 @@ public class CassandraConnector {
 	private static Session session;
 	static CassandraConnector client = new CassandraConnector();
 
-	private static PreparedStatement ps;
-	private static PreparedStatement load;
 	private static PreparedStatement alldata;
 	private static PreparedStatement alldatabatch;
-	//private static PreparedStatement update;
-	
-	public static void init() {
+
+	Logger logger = LoggerFactory
+			.getLogger(CassandraConnector.class);
+
+	public void init() {
 		session = client.connect("127.0.0.1");
-		ps = session.prepare("INSERT INTO top_movie (movieid, viewscnt, time) VALUES (?, ?, dateof(now()))");
-		load = session.prepare("select viewscnt from top_movie");
 		alldata = session.prepare("select * from top_movie");
 		alldatabatch = session.prepare("select * from top_movie_new");
-
 	}
 
-	public static void persist(String movieid, Integer count) {
 
-		try {
-			if (null == session) {
-				init();
-			}
-			
-			long existingcount = getExistingCount(movieid);
-			long l = count + existingcount;
-			
-			Long viewscnt = new Long(l);
-			BoundStatement bind = ps.bind(movieid, viewscnt);
-			session.execute(bind);
-			
-			if(existingcount == 0) {
-				System.out.println("Inserted the data for " + movieid +  "with value : "+l);
-			}else{
-				System.out.println("Updating the data for " + movieid+  "with value : "+l);
-			}
-			
-
-		} catch (Exception e) {
-			System.out.println(" Error while persisting the data in cassandra "
-					+ e);
-			e.printStackTrace();
-		}
-	}
-
-	public static Map<String, Long> getTopMovies(String mode) {
-		
-		Map<String, Long> moviesmap = new HashMap<String, Long>();;
+	public Map<String, Long> getTopMovies(String mode) {
+		Map<String, Long> moviesmap = new HashMap<String, Long>();
 		try {
 			if (null == session) {
 				init();
 			}
 			ResultSet result = null;
-			if(null != mode && mode.equalsIgnoreCase("realtime")) {
+			if (null != mode && mode.equalsIgnoreCase("realtime")) {
 				result = session.execute(alldata.bind());
-			}else {
+			} else {
 				result = session.execute(alldatabatch.bind());
 			}
-			
-			if( !result.isExhausted()) {
+
+			if (!result.isExhausted()) {
 				List<Row> alldata = result.all();
-				for(Row row : alldata) {
-					moviesmap.put(row.getString("movieid"),  row.getLong("viewscnt"));
+				for (Row row : alldata) {
+					moviesmap.put(row.getString("movieid"),
+							row.getLong("viewscnt"));
 				}
 			}
 		} catch (Exception e) {
-			System.out.println(" Exception while getting the count for movie " + e);
+			logger.info(" Exception while getting the count for movie "
+					+ e);
 		}
 		return moviesmap;
 	}
-	
-	public static Map<String, Long> getSortedTopMovies(String mode) {
+
+	public Map<String, Long> getSortedTopMovies(String mode) {
 		Map<String, Long> moviesmap = getTopMovies(mode);
-		
-		//System.out.println("UNSORTED MAP " +moviesmap);
-		
-        ValueComparator bvc =  new ValueComparator(moviesmap);
-        TreeMap<String,Long> sorted_map = new TreeMap<String,Long>(bvc);
-        sorted_map.putAll(moviesmap);
-        
-        System.out.println("SORTED MAP " + sorted_map);
+
+		ValueComparator bvc = new ValueComparator(moviesmap);
+		TreeMap<String, Long> sorted_map = new TreeMap<String, Long>(bvc);
+		sorted_map.putAll(moviesmap);
+
+		logger.info("SORTED MAP " + sorted_map);
 		return sorted_map;
 	}
-	
-	
-	private static long getExistingCount(String movieid) {
-		long value = 0;
-		try {
-			ResultSet result = session.execute(load.bind(movieid));
-			if( !result.isExhausted()) {
-				Row one = result.one();
-				value = one.getLong("viewscnt");
-				System.out.println(" Got the value for movie " + movieid + " value :" + value);
-			}
-		} catch (Exception e) {
-			System.out.println(" Exception while getting the count for movie " + movieid);
-		}
-		return value;
-	}
-	
+
 	public static void close() {
 		cluster.close();
 	}
@@ -141,7 +95,7 @@ public class CassandraConnector {
 		return cluster.connect("test");
 	}
 
-	public static String getTopMoviesList() {
+	public String getTopMoviesList() {
 		Map<String, Long> map = getSortedTopMovies("realtime");
 		List<Movies> moviesList = getMoviesInfomation(map, 5);
 		Gson g = new Gson();
@@ -150,22 +104,24 @@ public class CassandraConnector {
 
 	/**
 	 * Gets the movies information
+	 * 
 	 * @param map
 	 * @param lenght
 	 * @return
 	 */
-	private static List<Movies> getMoviesInfomation(Map<String, Long> map, int lenght) {
+	private List<Movies> getMoviesInfomation(Map<String, Long> map,
+			int lenght) {
 		List<Movies> moviesList = new ArrayList<Movies>();
 		int count = 0;
-		
-		for(String movieId : map.keySet()) {
+
+		for (String movieId : map.keySet()) {
 			Movies m = new Movies();
 			m.setMovieId(movieId);
 			m.setViewCount(map.get(movieId));
 			String movInfo = null;
 			try {
 				movInfo = FluentHbaseClient.getMovieInfo(movieId);
-				if(null != movInfo) {
+				if (null != movInfo) {
 					String[] array = movInfo.split("\\^");
 					m.setMovieGenre(array[0]);
 					m.setMovieName(array[1]);
@@ -177,56 +133,58 @@ public class CassandraConnector {
 			}
 			moviesList.add(m);
 			count++;
-			if(lenght != -1 && count > lenght) {
+			if (lenght != -1 && count > lenght) {
 				break;
 			}
 		}
 		return moviesList;
 	}
 
-	/**	
+	/**
 	 * Returns the aggregated view of the Batch And Real Time
 	 * 
 	 * @return
 	 */
-	public static String getAllTimeTopMoviesList() {
+	public String getAllTimeTopMoviesList() {
 		// Top Movies from the real time db
 		Map<String, Long> batchmap = getTopMovies("batch");
 		Map<String, Long> realtimemap = getTopMovies("real");
-		
-		for(String movie : realtimemap.keySet()) {
-			if(null != batchmap.get(movie)) {
-				System.out.println("--------");
-				batchmap.put(movie, batchmap.get(movie) + realtimemap.get(movie));
-			}else{
-				System.out.println("*****");
+
+		for (String movie : realtimemap.keySet()) {
+			if (null != batchmap.get(movie)) {
+				batchmap.put(movie,
+						batchmap.get(movie) + realtimemap.get(movie));
+			} else {
 				batchmap.put(movie, realtimemap.get(movie));
 			}
 		}
-		
-		ValueComparator bvc =  new ValueComparator(batchmap);
-	    TreeMap<String,Long> sorted_map = new TreeMap<String,Long>(bvc);
-	    sorted_map.putAll(batchmap);
-	    
-	    List<Movies> moviesList = getMoviesInfomation(sorted_map, 5);
+
+		ValueComparator bvc = new ValueComparator(batchmap);
+		TreeMap<String, Long> sorted_map = new TreeMap<String, Long>(bvc);
+		sorted_map.putAll(batchmap);
+
+		List<Movies> moviesList = getMoviesInfomation(sorted_map, 5);
 		Gson g = new Gson();
 		return g.toJson(moviesList);
 	}
-
 }
 
-
+/**
+ * Custom comparator class to sort the movies
+ * @author spras3
+ *
+ */
 class ValueComparator implements Comparator<String> {
 	Map<String, Long> map;
+
 	ValueComparator(Map<String, Long> map) {
 		this.map = map;
 	}
-	
-	
+
 	@Override
 	public int compare(String o1, String o2) {
-		int  i = (int) (map.get(o2) - map.get(o1));
-		if(i == 0) 
+		int i = (int) (map.get(o2) - map.get(o1));
+		if (i == 0)
 			i++;
 		return i;
 	}

@@ -1,0 +1,6 @@
+language: java
+
+install: echo "Testing the CI Process."
+
+jdk:
+  - oraclejdk7

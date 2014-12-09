@@ -2,7 +2,8 @@ language: java
 
 install: echo "Testing the CI Process."
 
-after_success: mvn cobertura:cobertura coveralls:cobertura
-
+after_success:
+  - mvn clean cobertura:cobertura coveralls:cobertura
+  
 jdk:
   - oraclejdk7

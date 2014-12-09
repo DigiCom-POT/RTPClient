@@ -1,5 +1,7 @@
 Light-weight rest client to access the batch and real time personalization
 ==========================================================================
+[![Build Status](https://travis-ci.org/DigiCom-POT/RTPClient.svg)](https://travis-ci.org/DigiCom-POT/RTPClient)
+
 
 Used tech stack:
 ----------------
